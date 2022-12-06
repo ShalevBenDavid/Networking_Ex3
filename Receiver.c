@@ -6,11 +6,12 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <signal.h>
 #include <stdbool.h>
 
-#define SERVER_PORT 80
-#define SERVER_IP_ADDRESS "172.0.0.1"
+#define PORT 86
+#define MAX_SIZE 300
 int main() {
     // Create listening socket.
     int listener = socket(AF_INET, SOCK_STREAM, 0);
@@ -33,11 +34,11 @@ int main() {
 
     // Create sockaddr_in for IPv4 for holding ip address and port and clean it.
     struct sockaddr_in serverAddress;
-    memset(&serverAddress, 0, sizeof(serverAddress));
+    memset(&serverAddress, '\0', sizeof(serverAddress));
 
     // Assign port and address to "serverAddress".
     serverAddress.sin_family = AF_INET;
-    serverAddress.sin_port = htons(SERVER_PORT); // Short, network byte order.
+    serverAddress.sin_port = htons(PORT); // Short, network byte order.
     serverAddress.sin_addr.s_addr = INADDR_ANY;
 
     // Binding port and address to socket and check if binding was successful.
@@ -51,7 +52,7 @@ int main() {
     }
 
     // Make server start listening and waiting and check if listen() was successful.
-    if (listen(listener, 300) == -1) { // We allow no more than 300 queue connections requests.
+    if (listen(listener, MAX_SIZE) == -1) { // We allow no more than MAX_SIZE queue connections requests.
         printf("listen() failed with error code : %d\n", errno);
         close(listener); // close the socket.
         exit(EXIT_FAILURE);
@@ -61,6 +62,7 @@ int main() {
     // Create sockaddr_in for IPv4 for holding ip address and port of client and cleans it.
     struct sockaddr_in clientAddress;
 
+    // Accept and establish new TCP connections.
     while(true) {
         memset(&clientAddress, 0, sizeof(clientAddress));
         unsigned int clientAddressLen = sizeof(clientAddress);
@@ -72,8 +74,9 @@ int main() {
             exit(EXIT_FAILURE);
         }
         else {
-            printf("A new client connection accepted\n");
+            printf("Connection with client established.\n");
         }
+        close(clientSocket);
     }
 
 }

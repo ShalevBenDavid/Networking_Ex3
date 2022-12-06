@@ -7,8 +7,8 @@
 #include <netinet/in.h>
 #include <unistd.h>
 
-#define SERVER_PORT 80
-#define SERVER_IP_ADDRESS "172.0.0.1"
+#define PORT 86
+#define IP_ADDRESS "127.0.0.1"
 #define FILE_SIZE 1048576 // file size + 1 for the \0.
 #define FILE_NAME "TextFile.txt"
 int main() {
@@ -49,12 +49,20 @@ int main() {
 
     // Create sockaddr_in for IPv4 for holding ip address and port and clean it.
     struct sockaddr_in serverAddress;
-    memset(&serverAddress, 0, sizeof(serverAddress));
+    memset(&serverAddress, '\0', sizeof(serverAddress));
 
     // Assign port and address to "serverAddress".
     serverAddress.sin_family = AF_INET;
-    serverAddress.sin_port = htons(SERVER_PORT); // Short, network byte order.
-    serverAddress.sin_addr.s_addr = inet_addr(SERVER_IP_ADDRESS);
+    serverAddress.sin_port = htons(PORT); // Short, network byte order.
+    serverAddress.sin_addr.s_addr = inet_addr(IP_ADDRESS);
+
+    // Convert address to binary.
+    int rval = inet_pton(AF_INET, IP_ADDRESS, &serverAddress.sin_addr);
+    if (rval <= 0)
+    {
+        printf("inet_pton() has failed!");
+        return -1;
+    }
 
     //Create connection with server.
     int connection = connect(socketFD, (struct sockaddr*) &serverAddress, sizeof(serverAddress));
