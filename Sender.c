@@ -6,11 +6,15 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <time.h>
 
-#define PORT 86
+#define PORT 8888
 #define IP_ADDRESS "127.0.0.1"
-#define FILE_SIZE 1048576 // file size + 1 for the \0.
+#define FILE_SIZE 1048575 // file size + 1 for the \0.
 #define FILE_NAME "TextFile.txt"
+
+int send_message(char*, int);
+
 int main() {
     //-------------------------------Read File-----------------------------
 
@@ -75,9 +79,37 @@ int main() {
     else {
         printf("Connection with server established.\n");
     }
-    // Close connection.
+
+    //-------------------------------Send Message---------------------------------
+    char ans = 0;
+    while (true) {
+        printf("Do you want to send file? Enter Y for Yes or N for No.");
+        scanf("%c", ans);
+        if (ans == 'N') { break;}
+        if (send_message(message, socketFD) == -1) {
+            printf("Failed to send first half of the message!")
+        }
+        else {
+            printf("Sent the first half of the file!")
+        }
+        if(send_message(message + FILE_SIZE / 2, socketFD) == -1) {
+            printf("Failed to send second half of the message!")
+        }
+        else {
+            printf("Sent the first half of the message");
+        }
+    }
+
+    //-------------------------------Close connection-----------------------------
     close(socketFD);
 
     return 0;
 }
+
+// Method for sending first half of message.
+int send_message(char* message, int socketFD) {
+    return send(socketFD, message, FILE_SIZE/2, 0);
+}
+
+
 

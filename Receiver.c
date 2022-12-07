@@ -10,24 +10,28 @@
 #include <signal.h>
 #include <stdbool.h>
 
-#define PORT 86
+#define PORT 8888
 #define MAX_SIZE 300
-int main() {
-    // Create listening socket.
-    int listener = socket(AF_INET, SOCK_STREAM, 0);
+#define FILE_SIZE 1048575 // file size + 1 for the \0.
 
-    // Check if we were successful in creating listening socket.
-    if (listener == -1) {
-        printf("Could not create listening socket: %d\n", errno);
+void recv_file(int);
+
+int main() {
+    // Creates socket named "socketFD". FD for file descriptor.
+    int SocketFD = socket(AF_INET, SOCK_STREAM, 0);
+
+    // Check if we were successful in creating socket.
+    if (SocketFD == -1) {
+        printf("Could not create socket: %d\n", errno);
         exit(EXIT_FAILURE); // Exit program and print EXIT_FAILURE (defined as 1 in stdlib.h).
     }
     else {
-        printf("Listening socket created!\n");
+        printf("Socket created successfully!\n");
     }
 
     // Check if address is already in use.
     int enableReuse = 1;
-    if (setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &enableReuse, sizeof enableReuse) ==  -1) {
+    if (setsockopt(SocketFD, SOL_SOCKET, SO_REUSEADDR, &enableReuse, sizeof enableReuse) ==  -1) {
         printf("setsockopt() failed with error code: %d\n" , errno);
         exit(EXIT_FAILURE); // Exit program and print EXIT_FAILURE (defined as 1 in stdlib.h).
     }
@@ -42,20 +46,20 @@ int main() {
     serverAddress.sin_addr.s_addr = INADDR_ANY;
 
     // Binding port and address to socket and check if binding was successful.
-    if (bind(listener, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) == -1) {
+    if (bind(SocketFD, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) == -1) {
         printf("bind() failed with error code: %d\n", errno);
-        close(listener); // close the socket.
-        exit(EXIT_FAILURE);
+        close(SocketFD); // close the socket.
+        exit(EXIT_FAILURE); // Exit program and print EXIT_FAILURE (defined as 1 in stdlib.h).
     }
     else {
         printf("binding was successful!\n");
     }
 
     // Make server start listening and waiting and check if listen() was successful.
-    if (listen(listener, MAX_SIZE) == -1) { // We allow no more than MAX_SIZE queue connections requests.
+    if (listen(SocketFD, MAX_SIZE) == -1) { // We allow no more than MAX_SIZE queue connections requests.
         printf("listen() failed with error code : %d\n", errno);
-        close(listener); // close the socket.
-        exit(EXIT_FAILURE);
+        close(SocketFD); // close the socket.
+        exit(EXIT_FAILURE); // Exit program and print EXIT_FAILURE (defined as 1 in stdlib.h).
     }
     printf("Waiting for incoming TCP-connections...\n");
 
@@ -66,17 +70,32 @@ int main() {
     while(true) {
         memset(&clientAddress, 0, sizeof(clientAddress));
         unsigned int clientAddressLen = sizeof(clientAddress);
-        int clientSocket = accept(listener, (struct sockaddr*)&clientAddress, &clientAddressLen);
+        int clientSocket = accept(SocketFD, (struct sockaddr*)&clientAddress, &clientAddressLen); // Accept connection.
         if (clientSocket == -1) {
             printf("listen failed with error code: %d\n", errno);
-            close(listener);
+            close(SocketFD);
             close(clientSocket);
-            exit(EXIT_FAILURE);
+            exit(EXIT_FAILURE); // Exit program and print EXIT_FAILURE (defined as 1 in stdlib.h).
         }
         else {
-            printf("Connection with client established.\n");
+            printf("Connection established.\n");
         }
+        write_file(clientSocket);
         close(clientSocket);
     }
+}
 
+// Method for receiving file from sender.
+void recv_file(int clientSocket) {
+    char buffer[FILE_SIZE];
+    while (true) {
+        int n = recv(clientSocket, buffer, FILE_SIZE/2, 0);
+        if (n <= 0) { // If there are no messages or an error occurred, we can stop and return.
+            return;
+        }
+        else {
+            printf("%s", n, buffer);
+        }
+        bzero(buffer,
+    }
 }
