@@ -102,10 +102,10 @@ void recv_message(int clientSocket) {
     size_t recvTotalLength = 0;
     t = clock();  // Start time.
     // receive first half
-    while (recvTotalLength <= FILE_SIZE / 2) {
+    while (recvTotalLength != FILE_SIZE / 2) {
         bzero(buffer, FILE_SIZE+1);
-        ssize_t receivedBytes = recv(clientSocket, buffer, FILE_SIZE / 2, 0);
-        if (receivedBytes <= 0 || recvTotalLength == FILE_SIZE / 2) break; // break if we got an error (-1) or peer closed half side of the socket (0).
+        ssize_t receivedBytes = recv(clientSocket, buffer, FILE_SIZE / 2 - recvTotalLength, 0);
+        if (receivedBytes <= 0) break; // break if we got an error (-1) or peer closed half side of the socket (0).
         printf("%s", buffer);
         recvTotalLength += receivedBytes;
     }
@@ -117,15 +117,13 @@ void recv_message(int clientSocket) {
     bzero(buffer, FILE_SIZE+1);
     recvTotalLength = 0;
     // receive second half
-    while (recvTotalLength <= FILE_SIZE / 2 - 10) {
+    while (recvTotalLength != FILE_SIZE / 2) {
         bzero(buffer, FILE_SIZE+1);
-        ssize_t receivedBytes = recv(clientSocket, buffer, FILE_SIZE / 2, 0);
+        ssize_t receivedBytes = recv(clientSocket, buffer, FILE_SIZE / 2 - recvTotalLength, 0);
 //        receivedBytes += recv(clientSocket, buffer, 2, 0);
-        if (receivedBytes <= 0 || recvTotalLength == FILE_SIZE / 2) break; // break if we got an error (-1) or peer closed half side of the socket (0).
+        if (receivedBytes <= 0) break; // break if we got an error (-1) or peer closed half side of the socket (0).
         printf("%s", buffer);
         recvTotalLength += receivedBytes;
     }
-    printf("recvTotalLength: %zu\n", recvTotalLength);
-
     printf("\n----------------------------\nfinished receiving second half\n------------------------------\n");
 }
