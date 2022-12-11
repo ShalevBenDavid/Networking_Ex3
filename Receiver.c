@@ -10,20 +10,19 @@
 #include <arpa/inet.h>
 #include <stdbool.h>
 
-#define PORT 8084
+#define PORT 8085
 #define MAX_CONNECTIONS 300
 #define FILE_SIZE 1048574
 #define ID1 2781
 #define ID2 8413
-#define SEG_SIZE 4096
 
+int recv_message(int);
 
-void recv_message(int);
-double averageTimes = 0.0; // Global variable for average times.
-double times[15]; // Array for holding times.
-int numOfTimes = 0;
+double times[2][15] = {0.0}; // Global array for holding times. first row is for first half, second row is for second half.
+int numOfTimes = 0; //  Global variable for number of times saved.
 
 int main() {
+    //----------------------------------Create TCP Connection---------------------------------
     // Creates endpoint for communication named "socketFD". FD for file descriptor.
     int SocketFD = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -74,7 +73,6 @@ int main() {
     struct sockaddr_in clientAddress;
 
     // Accept and establish new TCP connections.
-   //while(true) {
         memset(&clientAddress, 0, sizeof(clientAddress));
         unsigned int clientAddressLen = sizeof(clientAddress);
         int clientSocket = accept(SocketFD, (struct sockaddr*)&clientAddress, &clientAddressLen); // Accept connection.
@@ -89,41 +87,93 @@ int main() {
         }
 
         //----------------------------------Receive Messages---------------------------------
-        recv_message(clientSocket);
-        close(clientSocket);
+    while(true) {
+        if(recv_message(clientSocket) == -1){
+            printf("Exiting...\n");
+            break;
+        }
     }
-//}
+
+    // print times
+    for (int i = 0; i < numOfTimes; ++i) {
+        printf("%d - First Half: %lf\tSecond Half: %lf\t\n", i+1, times[0][i], times[1][i]);
+    }
+
+    double sum1 = 0.0; // sum time for the first part
+    double sum2 = 0.0; // sum time for the second part
+
+    for (int i = 0; i < numOfTimes; ++i) {
+        sum1 += times[0][i];
+        sum2 += times[1][i];
+    }
+
+    double average1 = (double) sum1 / numOfTimes; // average time for the first part
+    double average2 = (double) sum2 / numOfTimes; // average time for the second part
+
+    printf("Average time for the first part: %lf\n", average1);
+    printf("Average time for the first part: %lf\n", average2);
+    printf("Average time for the file: %lf\n", (average1 + average2)/2.0);
+
+    // Close socket.
+    close(clientSocket);
+}
 
 // Method for receiving message from sender.
-void recv_message(int clientSocket) {
-    char buffer[FILE_SIZE + 1]; // file size + 1 for the \0.
-    clock_t t;
-    double time = 0.0;
-    size_t recvTotalLength = 0;
+int recv_message(int clientSocket) {
+    char buffer[FILE_SIZE + 1]; // Array for holding the message. His size is size + 1 for the \0.
+    clock_t t; // Will help measure time.
+    double time = 0.0; // Will hold time that elapsed in seconds.
+    size_t receivedTotalBytes = 0;
     t = clock();  // Start time.
-    // receive first half
-    while (recvTotalLength != FILE_SIZE / 2) {
-        bzero(buffer, FILE_SIZE+1);
-        ssize_t receivedBytes = recv(clientSocket, buffer, FILE_SIZE / 2 - recvTotalLength, 0);
-        if (receivedBytes <= 0) break; // break if we got an error (-1) or peer closed half side of the socket (0).
-        printf("%s", buffer);
-        recvTotalLength += receivedBytes;
+
+    // change CC
+    char cc_reno[5] = {0};
+    strcpy(cc_reno, "reno");
+    if (setsockopt(clientSocket, IPPROTO_TCP, TCP_CONGESTION, cc_reno, strlen(cc_reno)) != 0) {
+        printf("error\n");
+    }
+
+
+    //----------------------------------Receive First Messages---------------------------------
+    while (receivedTotalBytes != FILE_SIZE / 2) {
+        bzero(buffer, FILE_SIZE + 1); // Clean buffer.
+        ssize_t receivedBytes = recv(clientSocket, buffer, FILE_SIZE / 2 - receivedTotalBytes, 0);
+        if (receivedBytes <= 0) break; // Break if we got an error (-1) or peer closed half side of the socket (0).
+        receivedTotalBytes += receivedBytes; // Add the new received bytes to the total bytes received.
+//        printf("%s", buffer);
+        // Check if we need to exit.
+        if(strcmp(buffer, "exit") == 0) return -1;
     }
     t = clock() - t;  // End time.
-    time = ((double) t) / CLOCKS_PER_SEC; // calculate the elapsed time in seconds.
-    averageTimes += time;
-    numOfTimes++;
-    printf("\n\n\n\n----------------------------\nfinished receiving first half\n------------------------------\n\n\n\n");
-    bzero(buffer, FILE_SIZE+1);
-    recvTotalLength = 0;
-    // receive second half
-    while (recvTotalLength != FILE_SIZE / 2) {
-        bzero(buffer, FILE_SIZE+1);
-        ssize_t receivedBytes = recv(clientSocket, buffer, FILE_SIZE / 2 - recvTotalLength, 0);
-//        receivedBytes += recv(clientSocket, buffer, 2, 0);
-        if (receivedBytes <= 0) break; // break if we got an error (-1) or peer closed half side of the socket (0).
-        printf("%s", buffer);
-        recvTotalLength += receivedBytes;
+    time = ((double) t) / CLOCKS_PER_SEC; // Calculate the elapsed time in seconds.
+    times[0][numOfTimes] = time;
+    printf("\n----------------------------\nFinished receiving first half\n------------------------------\n");
+
+    //----------------------------------Send authentication---------------------------------
+    char xor[6] = {0};
+    sprintf(xor, "%d", ID1 ^ ID2);
+    send(clientSocket, xor, 5, 0);
+
+    //----------------------------------Receive Second Messages---------------------------------
+    char cc_cubic[6] = {0};
+    strcpy(cc_cubic, "cubic");
+    if (setsockopt(clientSocket, IPPROTO_TCP, TCP_CONGESTION, cc_cubic, strlen(cc_cubic)) != 0) {
+        printf("error\n");
     }
-    printf("\n----------------------------\nfinished receiving second half\n------------------------------\n");
+    bzero(buffer, FILE_SIZE + 1);
+    receivedTotalBytes = 0;
+    t = clock();
+    while (receivedTotalBytes != FILE_SIZE / 2) {
+        bzero(buffer, FILE_SIZE+1);
+        ssize_t receivedBytes = recv(clientSocket, buffer, FILE_SIZE / 2 - receivedTotalBytes, 0);
+        if (receivedBytes <= 0) break; // break if we got an error (-1) or peer closed half side of the socket (0).
+//        printf("%s", buffer);
+        receivedTotalBytes += receivedBytes;
+    }
+    t = clock() - t;
+    time = ((double) t) / CLOCKS_PER_SEC;
+    times[1][numOfTimes] = time;
+    printf("\n----------------------------\nFinished receiving second half\n------------------------------\n");
+    numOfTimes++;
+    return 0;
 }

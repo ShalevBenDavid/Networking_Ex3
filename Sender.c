@@ -9,23 +9,14 @@
 #include <stdbool.h>
 #include <time.h>
 
-#define PORT 8084
+#define PORT 8085
 #define IP_ADDRESS "127.0.0.1"
 #define FILE_SIZE 1048574
 #define FILE_NAME "TextFile.txt"
 #define ID1 2781
 #define ID2 8413
 
-// Method for sending message.
-size_t send_message(char message[], int socketFD) {
-    size_t totalLengthSent = 0;
-    while (totalLengthSent < FILE_SIZE/2) {
-        ssize_t bytes = send(socketFD, message + totalLengthSent, FILE_SIZE/2 - totalLengthSent, 0);
-        totalLengthSent += bytes;
-    }
-    return 1;
-}
-
+size_t send_message(char[], int);
 
 int main() {
     //-------------------------------Read File-----------------------------
@@ -95,17 +86,41 @@ int main() {
     int ans;
     while (true) {
         printf("Do you want to send file? Enter Y for Yes or N for No.\n");
-//        ans = (char) getchar();
         while((ans = getchar()) == '\n' || getchar() == EOF);
-        if (ans == 'N') {break;}
-        if (send_message(message, socketFD) == -1) {
+        if (ans == 'N') {
+            send(socketFD, "exit", 4, 0);
+            break;
+        }
+        char cc_reno[5] = {0};
+        strcpy(cc_reno, "reno");
+        if (setsockopt(socketFD, IPPROTO_TCP, TCP_CONGESTION, cc_reno, strlen(cc_reno)) != 0) {
+            printf("error\n");
+        }
+
+        if (send_message(message, socketFD) <= 0) {
             printf("Failed to send first half of the message!\n");
         }
         else {
             printf("Sent the first half of the message.\n");
         }
 
-        if(send_message(message + FILE_SIZE / 2, socketFD) == -1) {
+        //-------------------------------Receive Authentication---------------------------------
+        char msg[6] = {0};
+        recv(socketFD, msg, 5, 0);
+        char xor[6] = {0};
+        sprintf(xor, "%d", ID1 ^ ID2);
+        if (strncmp(xor, msg, 5) == 0) {
+            printf("Authentication was successful...\n");
+        } else {
+            printf("Authentication failed...\n");
+        }
+
+        char cc_cubic[6] = {0};
+        strcpy(cc_cubic, "cubic");
+        if (setsockopt(socketFD, IPPROTO_TCP, TCP_CONGESTION, cc_cubic, strlen(cc_cubic)) != 0) {
+            printf("error\n");
+        }
+        if(send_message(message + FILE_SIZE / 2, socketFD) <= 0) {
             printf("Failed to send second half of the message!\n");
         }
         else {
@@ -121,3 +136,14 @@ int main() {
     return 0;
 }
 
+// Method for sending message.
+size_t send_message(char message[], int socketFD) {
+    size_t totalLengthSent = 0;
+    while (totalLengthSent < FILE_SIZE/2) {
+        ssize_t bytes = send(socketFD, message + totalLengthSent, FILE_SIZE/2 - totalLengthSent, 0);
+        if (bytes <= 0)
+            return bytes;
+        totalLengthSent += bytes;
+    }
+    return 1;
+}
