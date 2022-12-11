@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <time.h>
 #include <signal.h>
 #include <arpa/inet.h>
@@ -73,20 +74,20 @@ int main() {
     struct sockaddr_in clientAddress;
 
     // Accept and establish new TCP connections.
-        memset(&clientAddress, 0, sizeof(clientAddress));
-        unsigned int clientAddressLen = sizeof(clientAddress);
-        int clientSocket = accept(SocketFD, (struct sockaddr*)&clientAddress, &clientAddressLen); // Accept connection.
-        if (clientSocket == -1) {
-            printf("Failed to accept connection. -> accept() failed with error code: %d\n", errno);
-            close(SocketFD);
-            close(clientSocket);
-            exit(EXIT_FAILURE); // Exit program and print EXIT_FAILURE (defined as 1 in stdlib.h).
-        }
-        else {
-            printf("Connection established.\n");
-        }
+    memset(&clientAddress, 0, sizeof(clientAddress));
+    unsigned int clientAddressLen = sizeof(clientAddress);
+    int clientSocket = accept(SocketFD, (struct sockaddr*)&clientAddress, &clientAddressLen); // Accept connection.
+    if (clientSocket == -1) {
+        printf("Failed to accept connection. -> accept() failed with error code: %d\n", errno);
+        close(SocketFD);
+        close(clientSocket);
+        exit(EXIT_FAILURE); // Exit program and print EXIT_FAILURE (defined as 1 in stdlib.h).
+    }
+    else {
+        printf("Connection established.\n");
+    }
 
-        //----------------------------------Receive Messages---------------------------------
+    //----------------------------------Receive Messages---------------------------------
     while(true) {
         if(recv_message(clientSocket) == -1){
             printf("Exiting...\n");
@@ -122,9 +123,9 @@ int main() {
 int recv_message(int clientSocket) {
     char buffer[FILE_SIZE + 1]; // Array for holding the message. His size is size + 1 for the \0.
     clock_t t; // Will help measure time.
+    double diff;
     double time = 0.0; // Will hold time that elapsed in seconds.
     size_t receivedTotalBytes = 0;
-    t = clock();  // Start time.
 
     // change CC
     char cc_reno[5] = {0};
@@ -133,7 +134,8 @@ int recv_message(int clientSocket) {
         printf("error\n");
     }
 
-
+    t = clock(); //Start time
+    printf("start time: %ld\n", t);
     //----------------------------------Receive First Messages---------------------------------
     while (receivedTotalBytes != FILE_SIZE / 2) {
         bzero(buffer, FILE_SIZE + 1); // Clean buffer.
@@ -144,6 +146,7 @@ int recv_message(int clientSocket) {
         // Check if we need to exit.
         if(strcmp(buffer, "exit") == 0) return -1;
     }
+    printf("end time %ld\n", t);
     t = clock() - t;  // End time.
     time = ((double) t) / CLOCKS_PER_SEC; // Calculate the elapsed time in seconds.
     times[0][numOfTimes] = time;

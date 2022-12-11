@@ -5,6 +5,7 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <unistd.h>
 #include <stdbool.h>
 #include <time.h>
@@ -120,6 +121,7 @@ int main() {
         if (setsockopt(socketFD, IPPROTO_TCP, TCP_CONGESTION, cc_cubic, strlen(cc_cubic)) != 0) {
             printf("error\n");
         }
+        //----------------------------Send second Message------------------------------
         if(send_message(message + FILE_SIZE / 2, socketFD) <= 0) {
             printf("Failed to send second half of the message!\n");
         }
