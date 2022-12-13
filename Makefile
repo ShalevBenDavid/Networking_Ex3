@@ -3,12 +3,12 @@
 CC = gcc
 FLAGS = -Wall -g
 
-all: sender receiver
+all: Sender Receiver
 #Creating Program
-sender: sender.c
-	$(CC) $(FLAGS) -o sender sender.c
-receiver: receiver.c
-	$(CC) $(FLAGS) -o receiver receiver.c
+Sender: Sender.c
+	$(CC) $(FLAGS) -o Sender Sender.c
+Receiver: Receiver.c
+	$(CC) $(FLAGS) -o Receiver Receiver.c
 
 clean:
-	rm -f *.o sender receiver
+	rm -f *.o Sender Receiver

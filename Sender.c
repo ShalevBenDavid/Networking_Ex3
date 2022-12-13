@@ -10,7 +10,7 @@
 #include <stdbool.h>
 #include <time.h>
 
-#define PORT 8085
+#define PORT 8081
 #define IP_ADDRESS "127.0.0.1"
 #define FILE_SIZE 1048574
 #define FILE_NAME "TextFile.txt"
@@ -27,14 +27,14 @@ int main() {
 
     // Check if we were successful in opening file.
     if(file_pointer == NULL) {
-        printf("Error in opening file! -> fopen() failed with error code: %d\n", errno);
-        exit(EXIT_FAILURE); // Exit program and print EXIT_FAILURE (defined as 1 in stdlib.h).
+        printf("(-) Error in opening file! -> fopen() failed with error code: %d\n", errno);
+        exit(EXIT_FAILURE); // Exit program and return EXIT_FAILURE (defined as 1 in stdlib.h).
     }
     else {
-        printf("File opened successfully.\n");
+        printf("(=) File opened successfully.\n");
     }
 
-    // Create array for holding the message.
+    // Create times for holding the message.
     char message[FILE_SIZE + 1] = {0}; // file size + 1 for the \0.
     fread(message, sizeof(char), FILE_SIZE, file_pointer);
 
@@ -48,11 +48,11 @@ int main() {
 
     // Check if we were successful in creating socket.
     if(socketFD == -1) {
-        printf("Could not create socket! -> socket() failed with error code: %d\n", errno);
-        exit(EXIT_FAILURE); // Exit program and print EXIT_FAILURE (defined as 1 in stdlib.h).
+        printf("(-) Could not create socket! -> socket() failed with error code: %d\n", errno);
+        exit(EXIT_FAILURE); // Exit program and return EXIT_FAILURE (defined as 1 in stdlib.h).
     }
     else {
-        printf("Socket created successfully.\n");
+        printf("(=) Socket created successfully.\n");
     }
 
     // Create sockaddr_in for IPv4 for holding ip address and port and clean it.
@@ -67,8 +67,8 @@ int main() {
     // Convert address to binary.
     if (inet_pton(AF_INET, IP_ADDRESS, &serverAddress.sin_addr) <= 0)
     {
-        printf("Failed to convert IPv4 address to binary! -> inet_pton() failed with error code: %d\n", errno);
-        return -1;
+        printf("(-) Failed to convert IPv4 address to binary! -> inet_pton() failed with error code: %d\n", errno);
+        exit(EXIT_FAILURE); // Exit program and return EXIT_FAILURE (defined as 1 in stdlib.h).
     }
 
     //Create connection with server.
@@ -76,11 +76,11 @@ int main() {
 
     // Check if we were successful in connecting with server.
     if(connection == -1) {
-        printf("Could not connect to server! -> connect() failed with error code: %d\n", errno);
-        exit(EXIT_FAILURE); // Exit program and print EXIT_FAILURE (defined as 1 in stdlib.h).
+        printf("(-) Could not connect to server! -> connect() failed with error code: %d\n", errno);
+        exit(EXIT_FAILURE); // Exit program and return// EXIT_FAILURE (defined as 1 in stdlib.h).
     }
     else {
-        printf("Connection with server established.\n");
+        printf("(=) Connection with server established.\n\n");
     }
 
     //-------------------------------Send Message---------------------------------
@@ -92,17 +92,13 @@ int main() {
             send(socketFD, "exit", 4, 0);
             break;
         }
-        char cc_reno[5] = {0};
-        strcpy(cc_reno, "reno");
-        if (setsockopt(socketFD, IPPROTO_TCP, TCP_CONGESTION, cc_reno, strlen(cc_reno)) != 0) {
-            printf("error\n");
-        }
 
+        //----------------------------Send First Half------------------------------
         if (send_message(message, socketFD) <= 0) {
-            printf("Failed to send first half of the message!\n");
+            printf("(-) Failed to send first half of the message!\n");
         }
         else {
-            printf("Sent the first half of the message.\n");
+            printf("(+) Sent the first half of the message.\n");
         }
 
         //-------------------------------Receive Authentication---------------------------------
@@ -111,34 +107,45 @@ int main() {
         char xor[6] = {0};
         sprintf(xor, "%d", ID1 ^ ID2);
         if (strncmp(xor, msg, 5) == 0) {
-            printf("Authentication was successful...\n");
+            printf("(+) Authentication was successful...\n");
         } else {
-            printf("Authentication failed...\n");
+            printf("(-) Authentication failed...\n");
         }
 
-        char cc_cubic[6] = {0};
-        strcpy(cc_cubic, "cubic");
-        if (setsockopt(socketFD, IPPROTO_TCP, TCP_CONGESTION, cc_cubic, strlen(cc_cubic)) != 0) {
-            printf("error\n");
-        }
-        //----------------------------Send second Message------------------------------
-        if(send_message(message + FILE_SIZE / 2, socketFD) <= 0) {
-            printf("Failed to send second half of the message!\n");
+        //----------------------------------Change CC To Cubic-----------------------------------------------
+        if (setsockopt(socketFD, IPPROTO_TCP, TCP_CONGESTION, "cubic", 5) == -1) {
+            printf("(-) Failed to change cc algorithm! -> setsocketopt() failed with error code: %d\n", errno);
         }
         else {
-            printf("Sent the second half of the message.\n");
+            printf("(+) Set CC algorithm to: cubic\n");
+        }
+        printf("-----------------------------------------------------------------\n");
+        //----------------------------Send Second Half------------------------------
+        if(send_message(message + FILE_SIZE / 2, socketFD) <= 0) {
+            printf("(-) Failed to send second half of the message!\n");
+        }
+        else {
+            printf("(+) Sent the second half of the message.\n");
+        }
+
+        //----------------------------------Change CC To Reno-----------------------------------------------
+        if (setsockopt(socketFD, IPPROTO_TCP, TCP_CONGESTION, "reno", 4) == -1) {
+            printf("(-) Failed to change cc algorithm! -> setsocketopt() failed with error code: %d\n\n", errno);
+        }
+        else {
+            printf("(+) Set CC algorithm to: reno\n\n");
         }
     }
-    printf("Exiting...\n");
+    printf("(=) Exiting...\n");
 
-    //-------------------------------Close connection-----------------------------
+    //-------------------------------Close Connection-----------------------------
     close(socketFD);
-    printf("Connection closed!\n");
+    printf("(=) Connection closed!\n");
 
     return 0;
 }
 
-// Method for sending message.
+// Method for sending halves of message.
 size_t send_message(char message[], int socketFD) {
     size_t totalLengthSent = 0;
     while (totalLengthSent < FILE_SIZE/2) {
