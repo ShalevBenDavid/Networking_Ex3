@@ -10,9 +10,9 @@
 #include <stdbool.h>
 #include <time.h>
 
-#define PORT 8081
+#define PORT 8080
 #define IP_ADDRESS "127.0.0.1"
-#define FILE_SIZE 1048574
+#define FILE_SIZE 2097148
 #define FILE_NAME "TextFile.txt"
 #define ID1 2781
 #define ID2 8413
@@ -21,7 +21,6 @@ size_t send_message(char[], int);
 
 int main() {
     //-------------------------------Read File-----------------------------
-
     FILE* file_pointer;
     file_pointer = fopen(FILE_NAME, "r");
 
@@ -34,15 +33,15 @@ int main() {
         printf("(=) File opened successfully.\n");
     }
 
-    // Create times for holding the message.
+    // Create array for holding the file.
     char message[FILE_SIZE + 1] = {0}; // file size + 1 for the \0.
+    // Read from file to "message".
     fread(message, sizeof(char), FILE_SIZE, file_pointer);
 
     // Closes the stream. All buffers are flushed.
     fclose(file_pointer);
 
     //-------------------------------Create TCP Connection-----------------------------
-
     // Creates socket named "socketFD". FD for file descriptor.
     int socketFD = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -86,31 +85,6 @@ int main() {
     //-------------------------------Send Message---------------------------------
     int ans;
     while (true) {
-        printf("Do you want to send file? Enter Y for Yes or N for No.\n");
-        while((ans = getchar()) == '\n' || getchar() == EOF);
-        if (ans == 'N') {
-            send(socketFD, "exit", 4, 0);
-            break;
-        }
-
-        //----------------------------Send First Half------------------------------
-        if (send_message(message, socketFD) <= 0) {
-            printf("(-) Failed to send first half of the message!\n");
-        }
-        else {
-            printf("(+) Sent the first half of the message.\n");
-        }
-
-        //-------------------------------Receive Authentication---------------------------------
-        char msg[6] = {0};
-        recv(socketFD, msg, 5, 0);
-        char xor[6] = {0};
-        sprintf(xor, "%d", ID1 ^ ID2);
-        if (strncmp(xor, msg, 5) == 0) {
-            printf("(+) Authentication was successful...\n");
-        } else {
-            printf("(-) Authentication failed...\n");
-        }
 
         //----------------------------------Change CC To Cubic-----------------------------------------------
         if (setsockopt(socketFD, IPPROTO_TCP, TCP_CONGESTION, "cubic", 5) == -1) {
@@ -119,22 +93,50 @@ int main() {
         else {
             printf("(+) Set CC algorithm to: cubic\n");
         }
-        printf("-----------------------------------------------------------------\n");
-        //----------------------------Send Second Half------------------------------
-        if(send_message(message + FILE_SIZE / 2, socketFD) <= 0) {
-            printf("(-) Failed to send second half of the message!\n");
+
+        //----------------------------Send First Half------------------------------
+        if (send_message(message, socketFD) == -1) {
+            printf("(-) Failed to send first half of message! -> send() failed with error code: %d\n", errno);
         }
         else {
-            printf("(+) Sent the second half of the message.\n");
+            printf("(+) Sent the first half of the message.\n");
+        }
+
+        //-------------------------------Receive Authentication---------------------------------
+        char msg[6] = {0}; // Array for holding the xor result from receiver. It's of size 5. +1 for the \0.
+        recv(socketFD, msg, 5, 0);
+        char xor[6] = {0}; // Array of holding the xor result. It's of size 5. +1 for the \0.
+        sprintf(xor, "%d", ID1 ^ ID2); // Convert int (xor result) to string and put in "xor" array.
+        if (strncmp(xor, msg, 5) == 0) {
+            printf("(+) Authentication was successful...\n");
+        } else {
+            printf("(-) Authentication failed...\n");
         }
 
         //----------------------------------Change CC To Reno-----------------------------------------------
         if (setsockopt(socketFD, IPPROTO_TCP, TCP_CONGESTION, "reno", 4) == -1) {
-            printf("(-) Failed to change cc algorithm! -> setsocketopt() failed with error code: %d\n\n", errno);
+            printf("(-) Failed to change cc algorithm! -> setsocketopt() failed with error code: %d\n", errno);
         }
         else {
-            printf("(+) Set CC algorithm to: reno\n\n");
+            printf("(+) Set CC algorithm to: reno\n");
         }
+
+        //----------------------------Send Second Half------------------------------
+        if(send_message(message + FILE_SIZE / 2, socketFD) == -1) {
+            printf("(-) Failed to send second half of message! -> send() failed with error code: %d\n", errno);
+        }
+        else {
+            printf("(+) Sent the second half of the message.\n\n");
+        }
+
+        printf("Do you want to send file? Enter Y for Yes or N for No.\n"); // User decision.
+        while((ans = getchar()) == '\n' || getchar() == EOF);
+        if (ans == 'N') {
+            send(socketFD, "exit", 4, 0); // Send exit message to the receiver.
+            break;
+        }
+        printf("-----------------------------------------------------------------\n");
+
     }
     printf("(=) Exiting...\n");
 
@@ -147,11 +149,12 @@ int main() {
 
 // Method for sending halves of message.
 size_t send_message(char message[], int socketFD) {
-    size_t totalLengthSent = 0;
+    size_t totalLengthSent = 0; // Variable for keeping track of number of bytes sent.
     while (totalLengthSent < FILE_SIZE/2) {
         ssize_t bytes = send(socketFD, message + totalLengthSent, FILE_SIZE/2 - totalLengthSent, 0);
-        if (bytes <= 0)
-            return bytes;
+        if (bytes == -1) {
+            return -1;
+        }
         totalLengthSent += bytes;
     }
     return 1;

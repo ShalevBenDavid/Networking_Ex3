@@ -9,11 +9,12 @@
 #include <sys/time.h>
 #include <signal.h>
 #include <arpa/inet.h>
+#include <float.h>
 #include <stdbool.h>
 
-#define PORT 8081
+#define PORT 8080
 #define MAX_CONNECTIONS 300
-#define FILE_SIZE 1048574
+#define FILE_SIZE 2097148
 #define ID1 2781
 #define ID2 8413
 
@@ -23,7 +24,7 @@ int recv_half(int, int);
 int numOfTimes = 0; //  Global variable for number of times saved.
 int columns = 5; // Global variable representing number of columns in "times" array.
 char buffer[FILE_SIZE + 1]; // Global array for holding the message. His size is FILE_SIZE + 1 for the \0.
-double** times; // Global 2D array for holding times. First row is for first half, Second row is for second half.
+double** times = NULL; // Global 2D array for holding times. First row is for first half, Second row is for second half.
 
 
 int main() {
@@ -67,7 +68,7 @@ int main() {
         printf("(=) Binding was successful!\n");
     }
 
-    // Make server start listening and waiting and check if listen() was successful.
+    // Make server start listening and waiting, and check if listen() was successful.
     if (listen(SocketFD, MAX_CONNECTIONS) == -1) { // We allow no more than MAX_CONNECTIONS queue connections requests.
         printf("Failed to start listening! -> listen() failed with error code : %d\n", errno);
         close(SocketFD); // close the socket.
@@ -78,7 +79,7 @@ int main() {
     // Create sockaddr_in for IPv4 for holding ip address and port of client and cleans it.
     struct sockaddr_in clientAddress;
 
-    // Accept and establish new TCP connections.
+    //----------------------------------Get TCP Connection From The Sender---------------------------------
     memset(&clientAddress, 0, sizeof(clientAddress));
     unsigned int clientAddressLen = sizeof(clientAddress);
     int clientSocket = accept(SocketFD, (struct sockaddr*)&clientAddress, &clientAddressLen); // Accept connection.
@@ -93,15 +94,25 @@ int main() {
     }
 
     //----------------------------------Allocate Memory For Times Array---------------------------------
-    times = (double**)malloc(2 * sizeof(double));
+    times = (double**) malloc(2 * sizeof(double*));
+    // Check if malloc was successful.
+    if (times == NULL) {
+        printf("(-) Error in allocating memory!");
+    }
+
+    // Allocate memory for every row.
     for (int i = 0; i < 2; i++) {
-        times[i] = (double*)malloc(columns * sizeof(double));
+        times[i] = (double*) malloc(columns * sizeof(double));
+        // Check if malloc was successful.
+        if (times[i] == NULL) {
+            printf("(-) Error in allocating memory!");
+        }
     }
 
     // While the user still wants to send file, keep receiving.
     while(true) {
         if(recv_message(clientSocket) == -1){
-            printf("Exiting...\n\n");
+            printf("\nExiting...\n\n");
             break;
         }
     }
@@ -109,7 +120,7 @@ int main() {
     //----------------------------------Print Times ---------------------------------
     printf("Times in seconds for both halves:\n");
     for (int i = 0; i < numOfTimes; i++) {
-        printf("%d - First Half: %lf sec \t | \t Second Half: %lf sec\t\n", i + 1, times[0][i], times[1][i]);
+        printf("%d - First Half: %.12f sec \t | \t Second Half: %.12f sec\t\n", i + 1, times[0][i], times[1][i]);
     }
 
     double sum1 = 0.0; // Variable to sum times for the first part.
@@ -149,16 +160,19 @@ int recv_message(int clientSocket) {
         columns += 5;
         for (int i = 0; i < 2; i++) {
             times[i] = (double *) realloc(times[i], sizeof(double) * columns);
-            times[i] = (double *) realloc(times[i], sizeof(double) * columns);
+            // Check if realloc() was successful.
+            if (times[i] == NULL) {
+                printf("(-) Error in re-allocating memory!");
+            }
         }
     }
 
     //----------------------------------Change CC To Cubic-----------------------------------------------
     if (setsockopt(clientSocket, IPPROTO_TCP, TCP_CONGESTION, "cubic", 5) == -1) {
-        printf("(-) Failed to change cc algorithm! -> setsocketopt() failed with error code: %d\n", errno);
+        printf("(-) Failed to change cc algorithm! -> setsocketopt() failed with error code: %d", errno);
     }
     else {
-        printf("(+) Set CC algorithm to: cubic\n");
+        printf("(+) Set CC algorithm to: cubic");
     }
 
     //----------------------------------Receive First Messages---------------------------------
@@ -166,28 +180,28 @@ int recv_message(int clientSocket) {
         return -1;
     }
     printf("\n---------------------> Finished receiving first half <---------------------\n");
-    bzero(buffer, FILE_SIZE + 1);
+    bzero(buffer, FILE_SIZE + 1); // Clean buffer.
 
     //----------------------------------Send Authentication------------------------------------
-    char xor[6] = {0}; // The result is of size 5. +1 for the \0.
-    sprintf(xor, "%d", ID1 ^ ID2); //
-    send(clientSocket, xor, 5, 0);
+    char xor[6] = {0}; // Array of holding the xor result. It's of size 5. +1 for the \0.
+    sprintf(xor, "%d", ID1 ^ ID2); // Convert int (xor result) to string and put in "xor" array.
+    send(clientSocket, xor, 5, 0); // Send xor result to client.
 
     //----------------------------------Change CC To Reno---------------------------------------------
     if (setsockopt(clientSocket, IPPROTO_TCP, TCP_CONGESTION, "reno", 4) == -1) {
-        printf("(-) Failed to change cc algorithm! -> setsocketopt() failed with error code: %d\n", errno);
+        printf("(-) Failed to change cc algorithm! -> setsocketopt() failed with error code: %d", errno);
     }
     else {
-        printf("(+) Set CC algorithm to: reno\n");
+        printf("(+) Set CC algorithm to: reno");
     }
 
     //----------------------------------Receive Second Messages---------------------------------
     if(recv_half(clientSocket, 1) == -1) {
         return -1;
     }
-    printf("\n---------------------> Finished receiving second half <---------------------\n");
-    bzero(buffer, FILE_SIZE + 1);
-    numOfTimes++;
+    printf("\n---------------------> Finished receiving second half <---------------------\n\n");
+    bzero(buffer, FILE_SIZE + 1); // Clean buffer.
+    numOfTimes++; // Increase "numOfTimes" by 1.
     return 0;
 }
 
@@ -196,7 +210,7 @@ int recv_half(int clientSocket, int row) {
     double seconds; // Variable for measuring time in seconds.
     double microseconds; // Variable for measuring time in microseconds.
     double time; // Variable for measuring elapsed time.
-    bool startTime = false;
+    bool startTime = false; // Variable for knowing when to start timer.
     struct timeval begin, end; // Struct for measuring time.
 
     //----------------------------------Receive Half Loop---------------------------------
@@ -204,7 +218,7 @@ int recv_half(int clientSocket, int row) {
         bzero(buffer, FILE_SIZE + 1); // Clean buffer.
         ssize_t receivedBytes = recv(clientSocket, buffer, FILE_SIZE / 2 - receivedTotalBytes, 0);
         if (receivedBytes <= 0) { // Break if we got an error (-1) or peer closed half side of the socket (0).
-            printf("(-) Error in receiving data or peer closed half side of the socket");
+            printf("(-) Error in receiving data or peer closed half side of the socket.");
             break;
         }
         // Start time.
