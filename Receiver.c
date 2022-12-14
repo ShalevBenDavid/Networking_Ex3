@@ -131,8 +131,8 @@ int main() {
         sum2 += times[1][i];
     }
 
-    double average1 = (double) sum1 / numOfTimes; // Average time for the first part.
-    double average2 = (double) sum2 / numOfTimes; // Average time for the second part.
+    double average1 = sum1 / numOfTimes; // Average time for the first part.
+    double average2 = sum2 / numOfTimes; // Average time for the second part.
 
     // Prints averages.
     printf("\nAverages:\n");
