@@ -44,7 +44,7 @@ int main() {
 
     // Check if address is already in use.
     int enableReuse = 1;
-    if (setsockopt(SocketFD, SOL_SOCKET, SO_REUSEADDR, &enableReuse, sizeof(enableReuse)) <  0)  {
+    if (setsockopt(SocketFD, SOL_SOCKET, SO_REUSEADDR, &enableReuse, sizeof(enableReuse)) ==  -1)  {
         printf("setsockopt() failed with error code: %d\n" , errno);
         exit(EXIT_FAILURE); // Exit program and return EXIT_FAILURE (defined as 1 in stdlib.h).
     }
@@ -147,7 +147,12 @@ int main() {
     free(times);
 
     //----------------------------------Close Socket---------------------------------
-    close(clientSocket);
+    if(close(clientSocket) == -1) {
+        printf("(-) Failed to close connection! -> close() failed with error code: %d\n", errno);
+    }
+    else {
+        printf("(=) Connection closed!\n");
+    }
 }
 
 //----------------------------------Receive Messages-----------------------------------------
@@ -185,7 +190,12 @@ int recv_message(int clientSocket) {
     //----------------------------------Send Authentication------------------------------------
     char xor[6] = {0}; // Array of holding the xor result. It's of size 5. +1 for the \0.
     sprintf(xor, "%d", ID1 ^ ID2); // Convert int (xor result) to string and put in "xor" array.
-    send(clientSocket, xor, 5, 0); // Send xor result to client.
+    if (send(clientSocket, xor, 5, 0) == -1) { // Send xor result to client.
+        printf("(-) Failed to send authentication! -> send() failed with error code: %d\n", errno);
+    }
+    else {
+        printf("(+) Sent authentication.\n");
+    }
 
     //----------------------------------Change CC To Reno---------------------------------------------
     if (setsockopt(clientSocket, IPPROTO_TCP, TCP_CONGESTION, "reno", 4) == -1) {

@@ -104,7 +104,9 @@ int main() {
 
         //-------------------------------Receive Authentication---------------------------------
         char msg[6] = {0}; // Array for holding the xor result from receiver. It's of size 5. +1 for the \0.
-        recv(socketFD, msg, 5, 0);
+        if (recv(socketFD, msg, 5, 0) <= 0) { // Check if we got an error (-1) or peer closed half side of the socket (0).
+            printf("(-) Error in receiving data or peer closed half side of the socket.");
+        }
         char xor[6] = {0}; // Array of holding the xor result. It's of size 5. +1 for the \0.
         sprintf(xor, "%d", ID1 ^ ID2); // Convert int (xor result) to string and put in "xor" array.
         if (strncmp(xor, msg, 5) == 0) {
@@ -141,8 +143,12 @@ int main() {
     printf("(=) Exiting...\n");
 
     //-------------------------------Close Connection-----------------------------
-    close(socketFD);
-    printf("(=) Connection closed!\n");
+    if(close(socketFD) == -1) {
+        printf("(-) Failed to close connection! -> close() failed with error code: %d\n", errno);
+    }
+    else {
+        printf("(=) Connection closed!\n");
+    }
 
     return 0;
 }
