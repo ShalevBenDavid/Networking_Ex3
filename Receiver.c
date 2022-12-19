@@ -26,9 +26,7 @@ int columns = 5; // Global variable representing number of columns in "times" ar
 char buffer[FILE_SIZE + 1]; // Global array for holding the message. His size is FILE_SIZE + 1 for the \0.
 double** times = NULL; // Global 2D array for holding times. First row is for first half, Second row is for second half.
 
-
 int main() {
-
     //----------------------------------Create TCP Connection---------------------------------
     // Creates endpoint for communication named "socketFD". FD for file descriptor.
     int SocketFD = socket(AF_INET, SOCK_STREAM, 0);
@@ -76,10 +74,10 @@ int main() {
     }
     printf("(=) Waiting for incoming TCP-connections...\n");
 
-    // Create sockaddr_in for IPv4 for holding ip address and port of client and cleans it.
-    struct sockaddr_in clientAddress;
 
     //----------------------------------Get TCP Connection From The Sender---------------------------------
+    // Create sockaddr_in for IPv4 for holding ip address and port of client and cleans it.
+    struct sockaddr_in clientAddress;
     memset(&clientAddress, 0, sizeof(clientAddress));
     unsigned int clientAddressLen = sizeof(clientAddress);
     int clientSocket = accept(SocketFD, (struct sockaddr*)&clientAddress, &clientAddressLen); // Accept connection.
